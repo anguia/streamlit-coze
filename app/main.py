@@ -1,6 +1,7 @@
 import streamlit as st
 from database import create_tables, register_user, authenticate_user, save_conversation, load_conversation, save_api_info
 from chat import send_chat_request
+import asyncio
 
 # Ensure necessary tables are created
 create_tables()
@@ -10,6 +11,8 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = ""
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 def set_page_config():
     st.set_page_config(page_title="Chat Application", page_icon="💬", layout="wide")
@@ -81,6 +84,7 @@ def main():
                         st.success(f"Welcome {username}")
                         st.session_state.logged_in = True
                         st.session_state.username = username
+                        st.session_state.chat_history = load_conversation(username)
                         st.experimental_rerun()
                     else:
                         st.warning("Incorrect Username/Password")
@@ -100,36 +104,33 @@ def main():
         elif choice == "Logout" and st.session_state.logged_in:
             st.session_state.logged_in = False
             st.session_state.username = ""
+            st.session_state.chat_history = []
             st.experimental_rerun()
 
     with col2:
         if st.session_state.logged_in:
             st.subheader("Chat")
             username = st.session_state.username
-            conversation_id = "123"  # For demo purposes, this should be dynamically generated
-            chat_history = load_conversation(username)
+            chat_history = st.session_state.chat_history
 
             message = st.text_area("Enter your message:", height=150)
+            uploaded_files = st.file_uploader("Choose a file (jpg, jpeg, png, pdf, docx, xlsx, csv, mp3)", accept_multiple_files=True)
 
             if st.button("Send", type="primary"):
-                response = send_chat_request(conversation_id, message, chat_history)
+                response = asyncio.run(send_chat_request("123", message, chat_history, uploaded_files))
                 
-                chat_history.append({"user": username, "message": message})
-                chat_history.append({"bot": "Bot", "message": response.get("response", "")})
+                chat_history.append({"role": "user", "message": message})
+                chat_history.append({"role": "bot", "message": response.get("response", "")})
                 
                 save_conversation(username, chat_history)
+                st.session_state.chat_history = chat_history
+                st.experimental_rerun()
 
-                st.write("### Chat History:")
-                st.write("")
-                for entry in chat_history:
-                    role = "👤 User" if 'user' in entry else "🤖 Bot"
-                    st.markdown(f"**{role}:** {entry['message']}")
+            st.write("### Chat History:")
+            for entry in chat_history:
+                role = "👤 User" if entry['role'] == 'user' else "🤖 Bot"
+                st.markdown(f"**{role}:** {entry['message']}")
 
-                st.write("### Latest conversation saved in database:")
-                saved_conversation = load_conversation(username)
-                for entry in saved_conversation:
-                    role = "👤 User" if 'user' in entry else "🤖 Bot"
-                    st.markdown(f"**{role}:** {entry['message']}")
         else:
             st.subheader("Please login to start chatting.")
 

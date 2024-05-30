@@ -1,10 +1,20 @@
 import sqlite3
+import json
 
 def create_tables():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS api_info (username TEXT, user_id TEXT, bot_id TEXT, access_token TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY, 
+        password TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS api_info (
+        username TEXT, 
+        user_id TEXT, 
+        bot_id TEXT, 
+        access_token TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS conversations (
+        username TEXT, 
+        conversation TEXT)''')
     c.close()
     conn.close()
 
@@ -34,7 +44,8 @@ def save_api_info(username, user_id, bot_id, access_token):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('DELETE FROM api_info WHERE username = ?', (username,))
-    c.execute('INSERT INTO api_info (username, user_id, bot_id, access_token) VALUES (?, ?, ?, ?)', (username, user_id, bot_id, access_token))
+    c.execute('INSERT INTO api_info (username, user_id, bot_id, access_token) VALUES (?, ?, ?, ?)', 
+              (username, user_id, bot_id, access_token))
     conn.commit()
     c.close()
     conn.close()
@@ -49,9 +60,24 @@ def get_api_info(username):
     return api_info if api_info else None
 
 def save_conversation(username, conversation):
-    # To be implemented: Save conversation into the database
-    pass
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    conversation_json = json.dumps(conversation)
+    c.execute('DELETE FROM conversations WHERE username = ?', (username,))
+    c.execute('INSERT INTO conversations (username, conversation) VALUES (?, ?)', 
+              (username, conversation_json))
+    conn.commit()
+    c.close()
+    conn.close()
 
 def load_conversation(username):
-    # To be implemented: Load conversation from the database
-    return []
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT conversation FROM conversations WHERE username = ?', (username,))
+    conversation_row = c.fetchone()
+    c.close()
+    conn.close()
+    if conversation_row:
+        return json.loads(conversation_row[0])
+    else:
+        return []
